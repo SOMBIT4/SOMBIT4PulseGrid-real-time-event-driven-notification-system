@@ -4,10 +4,12 @@ import { issueToken } from "./auth.js";
 import type { EventBus } from "./bus.js";
 import type { EventStore } from "./store.js";
 import { publishInputSchema } from "./events.js";
+import { registry, eventsPublished } from "./metrics.js";
 
 // POST /events          — publish event onto bus + persist to stream
 // POST /tokens          — issue signed subscriber token
 // GET  /events/history  — replay events since a cursor (Redis stream ID)
+// GET  /metrics         — Prometheus metrics
 // GET  /health          — liveness probe
 export async function registerRoutes(
   app: FastifyInstance,
@@ -19,6 +21,7 @@ export async function registerRoutes(
     if (!parsed.success) return reply.status(400).send({ error: parsed.error.flatten() });
 
     const event = { id: randomUUID(), ts: Date.now(), ...parsed.data };
+    eventsPublished.inc({ channel: event.channel });
     await store.append(event);
     await bus.publish(event);
     return reply.status(202).send({ id: event.id });
@@ -39,5 +42,11 @@ export async function registerRoutes(
     return reply.send({ token, sub, channels, expiresIn: ttl });
   });
 
+  app.get("/metrics", async (_req, reply) => {
+    reply.header("Content-Type", registry.contentType);
+    return reply.send(await registry.metrics());
+  });
+
   app.get("/health", async (_req, reply) => reply.send({ ok: true }));
 }
+
