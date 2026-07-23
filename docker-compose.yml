@@ -6,6 +6,26 @@ services:
     command: ["redis-server", "--appendonly", "yes"]
     volumes:
       - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  app:
+    build: .
+    ports:
+      - "3000:3000"
+    environment:
+      REDIS_URL: redis://redis:6379
+      PORT: 3000
+      HOST: 0.0.0.0
+      LOG_LEVEL: info
+      AUTH_SECRET: ${AUTH_SECRET:-change-me-in-production}
+    depends_on:
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
 
 volumes:
   redis-data:
