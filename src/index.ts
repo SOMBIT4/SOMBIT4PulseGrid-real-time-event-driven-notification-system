@@ -1,4 +1,5 @@
 import Fastify from "fastify";
+import rateLimit from "@fastify/rate-limit";
 import { WebSocketServer } from "ws";
 import { config } from "./config.js";
 import { logger } from "./logger.js";
@@ -30,7 +31,17 @@ async function main() {
           ? { target: "pino-pretty", options: { colorize: true } }
           : undefined,
     },
+    bodyLimit: 65536, // 64 KB max payload
   });
+
+  await app.register(rateLimit, {
+    max: 100,
+    timeWindow: "1 minute",
+    redis: pub,
+    keyGenerator: (req) =>
+      (req.headers["x-producer-id"] as string | undefined) ?? req.ip,
+  });
+
   await registerRoutes(app, bus, store);
 
   await app.ready();
