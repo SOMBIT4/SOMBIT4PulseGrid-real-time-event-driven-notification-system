@@ -8,7 +8,7 @@ import type { SubscriptionRegistry, Subscriber } from "./registry.js";
 
 // A live WebSocket subscriber. Extends the registry's Subscriber shape so the
 // registry can index it directly.
-interface WsSubscriber extends Subscriber {
+export interface WsSubscriber extends Subscriber {
   socket: WebSocket;
   allowed: Set<string>; // channels the token authorizes
 }

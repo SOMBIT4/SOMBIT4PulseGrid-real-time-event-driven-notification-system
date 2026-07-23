@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
-import { DeliveryManager } from "../delivery.js";
-import type { Event } from "../events.js";
+import { DeliveryManager } from "./delivery.js";
+import type { Event } from "./events.js";
 
 const event: Event = { id: "e1", channel: "ch", type: "test", payload: {}, ts: Date.now() };
 

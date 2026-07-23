@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { SubscriptionRegistry } from "../registry.js";
+import { SubscriptionRegistry, type Subscriber } from "./registry.js";
 
 describe("SubscriptionRegistry", () => {
   let reg: SubscriptionRegistry;
@@ -10,7 +10,7 @@ describe("SubscriptionRegistry", () => {
 
   it("adds and finds subscriber by channel", () => {
     reg.add({ id: "a", channels: new Set(["ch1"]) });
-    expect(reg.subscribersFor("ch1").map((s) => s.id)).toEqual(["a"]);
+    expect(reg.subscribersFor("ch1").map((s: Subscriber) => s.id)).toEqual(["a"]);
   });
 
   it("removes subscriber from all channels", () => {

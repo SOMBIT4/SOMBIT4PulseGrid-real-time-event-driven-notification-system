@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { issueToken, verifyToken } from "../auth.js";
+import { issueToken, verifyToken } from "./auth.js";
 
 describe("auth tokens", () => {
   const claims = { sub: "user-1", channels: ["alerts", "news"], exp: Math.floor(Date.now() / 1000) + 3600 };
