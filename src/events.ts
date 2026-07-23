@@ -8,6 +8,8 @@ export const eventSchema = z.object({
   type: z.string().min(1),
   payload: z.unknown(),
   ts: z.number(),
+  // Redis stream ID assigned on append; clients track it to replay missed events.
+  cursor: z.string().optional(),
 });
 
 export type Event = z.infer<typeof eventSchema>;
