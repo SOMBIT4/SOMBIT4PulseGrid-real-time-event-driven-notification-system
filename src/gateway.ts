@@ -7,6 +7,7 @@ import { logger } from "./logger.js";
 import type { SubscriptionRegistry, Subscriber } from "./registry.js";
 import { webhookSink, emailSink } from "./sinks.js";
 import type { ChannelConfig } from "./channels.js";
+import { activeConnections } from "./metrics.js";
 
 export interface WsSubscriber extends Subscriber {
   socket: WebSocket;
@@ -38,6 +39,7 @@ export function attachGateway(
       delivery: claims.delivery ?? [],
     };
     registry.add(sub);
+    activeConnections.inc();
     logger.info({ subscriberId: sub.id }, "ws connected");
 
     socket.on("message", (raw) => {
@@ -52,6 +54,7 @@ export function attachGateway(
 
     socket.on("close", () => {
       registry.remove(sub.id);
+      activeConnections.dec();
       logger.info({ subscriberId: sub.id }, "ws disconnected");
     });
 

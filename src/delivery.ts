@@ -1,9 +1,8 @@
 import { config } from "./config.js";
 import type { Event } from "./events.js";
 import { logger } from "./logger.js";
+import { eventsDelivered, deliveryFailures, deliveryDuration } from "./metrics.js";
 
-// A sink is the transport that actually pushes an event to one subscriber.
-// Returns/throws: resolve = delivered, reject = failed (will retry).
 export type Sink = (event: Event) => Promise<void>;
 
 interface Attempt {
@@ -11,11 +10,9 @@ interface Attempt {
   sink: Sink;
   subscriberId: string;
   retries: number;
+  sinkLabel: string;
 }
 
-// DeliveryManager guarantees at-least-once local delivery with exponential
-// backoff. If a sink keeps failing past DELIVERY_MAX_RETRIES, the event is
-// dropped and logged (dead-letter).
 // ponytail: in-memory retry queue, lost on crash. Add Redis-backed queue if
 // deliveries must survive restarts.
 export class DeliveryManager {
@@ -26,14 +23,19 @@ export class DeliveryManager {
     private readonly baseDelayMs = config.DELIVERY_BASE_DELAY_MS,
   ) {}
 
-  deliver(subscriberId: string, event: Event, sink: Sink): void {
-    void this.attempt({ event, sink, subscriberId, retries: 0 });
+  deliver(subscriberId: string, event: Event, sink: Sink, sinkLabel = "ws"): void {
+    void this.attempt({ event, sink, subscriberId, retries: 0, sinkLabel });
   }
 
   private async attempt(a: Attempt): Promise<void> {
+    const end = deliveryDuration.startTimer({ sink: a.sinkLabel });
     try {
       await a.sink(a.event);
+      end();
+      eventsDelivered.inc({ sink: a.sinkLabel });
     } catch (err) {
+      end();
+      deliveryFailures.inc({ sink: a.sinkLabel });
       if (a.retries >= this.maxRetries) {
         logger.error(
           { err, subscriberId: a.subscriberId, eventId: a.event.id },
@@ -50,7 +52,6 @@ export class DeliveryManager {
     }
   }
 
-  // Cancel pending retries — used on shutdown so timers don't keep the process alive.
   stop(): void {
     for (const t of this.timers) clearTimeout(t);
     this.timers.clear();
