@@ -8,11 +8,13 @@ import { SubscriptionRegistry } from "./registry.js";
 import { DeliveryManager } from "./delivery.js";
 import { attachGateway, dispatch, type WsSubscriber } from "./gateway.js";
 import { registerRoutes } from "./routes.js";
+import { EventStore } from "./store.js";
 import http from "node:http";
 
 async function main() {
   const pub = createRedis("client");
   const sub = createRedis("subscriber");
+  const store = new EventStore(pub);
   const bus = new EventBus(pub, sub);
   const registry = new SubscriptionRegistry<WsSubscriber>();
   const delivery = new DeliveryManager();
@@ -29,7 +31,7 @@ async function main() {
           : undefined,
     },
   });
-  await registerRoutes(app, bus);
+  await registerRoutes(app, bus, store);
 
   await app.ready();
   const wss = new WebSocketServer({ server: app.server as http.Server });
