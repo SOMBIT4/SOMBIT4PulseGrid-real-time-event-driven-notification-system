@@ -1,14 +1,16 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { config } from "./config.js";
+import type { ChannelConfig } from "./channels.js";
 
 // Minimal stateless subscriber token: base64url(payload).hmac. Avoids a JWT
 // dependency for what is a single signed claim set.
 // ponytail: HMAC-signed opaque token, swap for JWT lib if you need standard claims/rotation.
 
 export interface TokenClaims {
-  sub: string; // subscriber id
-  channels: string[]; // channels this subscriber may listen on
-  exp: number; // unix seconds
+  sub: string;
+  channels: string[];
+  exp: number;
+  delivery?: ChannelConfig[]; // optional extra delivery sinks (webhook, email)
 }
 
 function sign(data: string): string {
