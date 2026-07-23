@@ -5,15 +5,15 @@ import type { DeliveryManager } from "./delivery.js";
 import type { Event } from "./events.js";
 import { logger } from "./logger.js";
 import type { SubscriptionRegistry, Subscriber } from "./registry.js";
+import { webhookSink, emailSink } from "./sinks.js";
+import type { ChannelConfig } from "./channels.js";
 
-// A live WebSocket subscriber. Extends the registry's Subscriber shape so the
-// registry can index it directly.
 export interface WsSubscriber extends Subscriber {
   socket: WebSocket;
-  allowed: Set<string>; // channels the token authorizes
+  allowed: Set<string>;
+  delivery: ChannelConfig[]; // extra sinks beyond WebSocket
 }
 
-// Client → server control messages.
 type ClientMessage =
   | { action: "subscribe"; channel: string }
   | { action: "unsubscribe"; channel: string };
@@ -35,6 +35,7 @@ export function attachGateway(
       channels: new Set(),
       allowed: new Set(claims.channels),
       socket,
+      delivery: claims.delivery ?? [],
     };
     registry.add(sub);
     logger.info({ subscriberId: sub.id }, "ws connected");
@@ -58,15 +59,25 @@ export function attachGateway(
   });
 }
 
-// Wire the bus into the gateway: every event fans out to matching subscribers
-// through the delivery manager (which handles retry/backoff).
 export function dispatch(
   event: Event,
   registry: SubscriptionRegistry<WsSubscriber>,
   delivery: DeliveryManager,
 ): void {
   for (const sub of registry.subscribersFor(event.channel)) {
+    // WebSocket sink
     delivery.deliver(sub.id, event, (e) => pushToSocket(sub.socket, e));
+
+    // Extra sinks (webhook, email)
+    for (const ch of sub.delivery) {
+      if (ch.type === "webhook") {
+        const cfg = ch;
+        delivery.deliver(`${sub.id}:webhook`, event, (e) => webhookSink(cfg, e));
+      } else if (ch.type === "email") {
+        const cfg = ch;
+        delivery.deliver(`${sub.id}:email`, event, (e) => emailSink(cfg, e));
+      }
+    }
   }
 }
 
@@ -89,7 +100,6 @@ function handleControl(
 }
 
 function authenticate(req: IncomingMessage) {
-  // Token from ?token= query param or Authorization: Bearer header.
   const url = new URL(req.url ?? "", "http://localhost");
   const fromQuery = url.searchParams.get("token");
   const header = req.headers.authorization;
